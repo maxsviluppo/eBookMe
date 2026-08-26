@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile information and preferences",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" },
+        "settings": { "type": "object" }
+      },
+      "required": ["userId", "email"]
+    },
+    "UserBook": {
+      "title": "User Book",
+      "description": "Custom or saved eBook owned by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "author": { "type": "string" },
+        "year": { "type": "string" },
+        "genre": { "type": "string" },
+        "coverEmblem": { "type": "string" },
+        "customLogoUrl": { "type": "string" },
+        "description": { "type": "string" },
+        "chapters": { "type": "array" },
+        "fileType": { "type": "string" },
+        "fileSize": { "type": "number" },
+        "isCustom": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "author", "chapters"]
+    },
+    "ReadingProgress": {
+      "title": "Reading Progress",
+      "description": "User progress for a specific book",
+      "type": "object",
+      "properties": {
+        "bookId": { "type": "string" },
+        "userId": { "type": "string" },
+        "currentChapterId": { "type": "string" },
+        "currentChapterIndex": { "type": "number" },
+        "percentage": { "type": "number" },
+        "lastReadAt": { "type": "string" }
+      },
+      "required": ["bookId", "userId", "currentChapterId"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "User bookmark in an eBook",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "bookId": { "type": "string" },
+        "chapterId": { "type": "string" },
+        "chapterTitle": { "type": "string" },
+        "paragraphIndex": { "type": "number" },
+        "snippet": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "bookId", "chapterId", "snippet"]
+    },
+    "Highlight": {
+      "title": "Highlight",
+      "description": "User text highlight and personal annotation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "bookId": { "type": "string" },
+        "chapterId": { "type": "string" },
+        "chapterTitle": { "type": "string" },
+        "text": { "type": "string" },
+        "note": { "type": "string" },
+        "color": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "bookId", "chapterId", "text", "color"]
+    }
+  },
+  "firestoreRules": {
+    "users": {
+      "read": "request.auth != null && request.auth.uid == userId",
+      "write": "request.auth != null && request.auth.uid == userId"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Book, ReaderSettings, BookmarkItem, HighlightItem } from './types';
 import { SAMPLE_BOOKS } from './data/sampleBooks';
 import { CoverView } from './components/CoverView';
@@ -10,7 +10,26 @@ import { LibraryModal } from './components/LibraryModal';
 import { CustomBookModal } from './components/CustomBookModal';
 import { LogoCustomizerModal } from './components/LogoCustomizerModal';
 import { SearchModal } from './components/SearchModal';
+import { AuthModal } from './components/AuthModal';
+import { UserAccountModal } from './components/UserAccountModal';
 import { THEME_CONFIGS } from './utils/themeStyles';
+import {
+  auth,
+  UserProfile,
+  saveUserBookToCloud,
+  deleteUserBookFromCloud,
+  subscribeToUserBooks,
+  saveReadingProgressToCloud,
+  saveBookmarkToCloud,
+  deleteBookmarkFromCloud,
+  subscribeToUserBookmarks,
+  saveHighlightToCloud,
+  deleteHighlightFromCloud,
+  subscribeToUserHighlights,
+  saveReaderSettingsToCloud,
+  getReaderSettingsFromCloud
+} from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const DEFAULT_SETTINGS: ReaderSettings = {
   theme: 'isabelline',
@@ -26,6 +45,9 @@ const DEFAULT_SETTINGS: ReaderSettings = {
 };
 
 export default function App() {
+  // Current logged in Firebase user profile
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
   // Books library state
   const [books, setBooks] = useState<Book[]>(() => {
     const saved = localStorage.getItem('ebook_reader_books');
@@ -99,6 +121,8 @@ export default function App() {
   const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   // Sync to local storage
   useEffect(() => {
@@ -132,9 +156,90 @@ export default function App() {
     document.body.style.backgroundColor = currentThemeConfig.bgHex;
   }, [settings.theme]);
 
+  // ================= FIREBASE AUTH & REAL-TIME SYNC =================
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const profile: UserProfile = {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          isAnonymous: user.isAnonymous
+        };
+        setCurrentUser(profile);
+
+        // Load cloud settings if available
+        const cloudSettings = await getReaderSettingsFromCloud(user.uid);
+        if (cloudSettings) {
+          setSettings((prev) => ({ ...prev, ...cloudSettings }));
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  // Subscribe to Cloud Books, Bookmarks, Highlights when user is logged in
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    // 1. Subscribe to Cloud Books
+    const unsubBooks = subscribeToUserBooks(currentUser.uid, (cloudBooks) => {
+      if (cloudBooks && cloudBooks.length > 0) {
+        setBooks((prev) => {
+          // Merge sample books and cloud books without duplicates
+          const sampleIds = new Set(SAMPLE_BOOKS.map((s) => s.id));
+          const nonCloudCustom = prev.filter(
+            (b) => !sampleIds.has(b.id) && !cloudBooks.some((cb) => cb.id === b.id)
+          );
+          return [...cloudBooks, ...nonCloudCustom, ...SAMPLE_BOOKS];
+        });
+      }
+    });
+
+    // 2. Subscribe to Cloud Bookmarks
+    const unsubBookmarks = subscribeToUserBookmarks(currentUser.uid, (cloudBms) => {
+      if (cloudBms && cloudBms.length > 0) {
+        setBookmarks((prev) => {
+          const map = new Map<string, BookmarkItem>();
+          prev.forEach((b) => map.set(b.id, b));
+          cloudBms.forEach((b) => map.set(b.id, b));
+          return Array.from(map.values());
+        });
+      }
+    });
+
+    // 3. Subscribe to Cloud Highlights
+    const unsubHighlights = subscribeToUserHighlights(currentUser.uid, (cloudHls) => {
+      if (cloudHls && cloudHls.length > 0) {
+        setHighlights((prev) => {
+          const map = new Map<string, HighlightItem>();
+          prev.forEach((h) => map.set(h.id, h));
+          cloudHls.forEach((h) => map.set(h.id, h));
+          return Array.from(map.values());
+        });
+      }
+    });
+
+    return () => {
+      unsubBooks();
+      unsubBookmarks();
+      unsubHighlights();
+    };
+  }, [currentUser?.uid]);
+
   // Helper functions
   const handleUpdateSettings = (newPartial: Partial<ReaderSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newPartial }));
+    setSettings((prev) => {
+      const updated = { ...prev, ...newPartial };
+      if (currentUser?.uid) {
+        saveReaderSettingsToCloud(currentUser.uid, updated).catch(console.error);
+      }
+      return updated;
+    });
   };
 
   const handleSelectBook = (book: Book) => {
@@ -142,23 +247,65 @@ export default function App() {
     setCurrentChapterId(book.chapters[0]?.id || 'cap-1');
   };
 
-  const handleAddBook = (newBook: Book) => {
+  const handleAddBook = async (newBook: Book) => {
     setBooks((prev) => [newBook, ...prev]);
     setCurrentBookId(newBook.id);
     setCurrentChapterId(newBook.chapters[0]?.id || 'cap-1');
     setViewMode('reader');
+
+    // Save to Firestore if user logged in
+    if (currentUser?.uid) {
+      try {
+        await saveUserBookToCloud(currentUser.uid, newBook);
+      } catch (err) {
+        console.error('Error saving book to cloud:', err);
+      }
+    }
+  };
+
+  const handleDeleteBook = async (bookId: string) => {
+    setBooks((prev) => prev.filter((b) => b.id !== bookId));
+    if (currentBookId === bookId) {
+      const remaining = books.filter((b) => b.id !== bookId);
+      if (remaining.length > 0) {
+        setCurrentBookId(remaining[0].id);
+        setCurrentChapterId(remaining[0].chapters[0]?.id || 'cap-1');
+      }
+    }
+
+    if (currentUser?.uid) {
+      try {
+        await deleteUserBookFromCloud(currentUser.uid, bookId);
+      } catch (err) {
+        console.error('Error deleting book from cloud:', err);
+      }
+    }
   };
 
   const handleUpdateCurrentBookLogo = (emblem: string) => {
-    setBooks((prev) =>
-      prev.map((b) => (b.id === currentBook.id ? { ...b, coverEmblem: emblem, customLogoUrl: undefined } : b))
-    );
+    setBooks((prev) => {
+      const updated = prev.map((b) =>
+        b.id === currentBook.id ? { ...b, coverEmblem: emblem, customLogoUrl: undefined } : b
+      );
+      const updatedBook = updated.find((b) => b.id === currentBook.id);
+      if (updatedBook && currentUser?.uid && (updatedBook.id.startsWith('custom-') || updatedBook.id.startsWith('book-'))) {
+        saveUserBookToCloud(currentUser.uid, updatedBook).catch(console.error);
+      }
+      return updated;
+    });
   };
 
   const handleUploadCustomLogo = (url: string | undefined) => {
-    setBooks((prev) =>
-      prev.map((b) => (b.id === currentBook.id ? { ...b, customLogoUrl: url } : b))
-    );
+    setBooks((prev) => {
+      const updated = prev.map((b) =>
+        b.id === currentBook.id ? { ...b, customLogoUrl: url } : b
+      );
+      const updatedBook = updated.find((b) => b.id === currentBook.id);
+      if (updatedBook && currentUser?.uid && (updatedBook.id.startsWith('custom-') || updatedBook.id.startsWith('book-'))) {
+        saveUserBookToCloud(currentUser.uid, updatedBook).catch(console.error);
+      }
+      return updated;
+    });
   };
 
   const handleAddBookmark = (snippet: string, paragraphIndex: number) => {
@@ -173,10 +320,17 @@ export default function App() {
       createdAt: new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
     };
     setBookmarks((prev) => [newBm, ...prev]);
+
+    if (currentUser?.uid) {
+      saveBookmarkToCloud(currentUser.uid, newBm).catch(console.error);
+    }
   };
 
   const handleRemoveBookmark = (id: string) => {
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
+    if (currentUser?.uid) {
+      deleteBookmarkFromCloud(currentUser.uid, id).catch(console.error);
+    }
   };
 
   const handleAddHighlight = (text: string, color: 'yellow' | 'green' | 'blue' | 'rose', note?: string) => {
@@ -192,13 +346,35 @@ export default function App() {
       createdAt: new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }),
     };
     setHighlights((prev) => [newHl, ...prev]);
+
+    if (currentUser?.uid) {
+      saveHighlightToCloud(currentUser.uid, newHl).catch(console.error);
+    }
   };
 
   const handleRemoveHighlight = (id: string) => {
     setHighlights((prev) => prev.filter((h) => h.id !== id));
+    if (currentUser?.uid) {
+      deleteHighlightFromCloud(currentUser.uid, id).catch(console.error);
+    }
+  };
+
+  const handleSelectChapter = (chapterId: string) => {
+    setCurrentChapterId(chapterId);
+    if (currentUser?.uid) {
+      const idx = currentBook.chapters.findIndex((c) => c.id === chapterId);
+      const pct = Math.round(((idx + 1) / currentBook.chapters.length) * 100);
+      saveReadingProgressToCloud(currentUser.uid, currentBook.id, chapterId, idx, pct).catch(console.error);
+    }
   };
 
   const themeConfig = THEME_CONFIGS[settings.theme];
+
+  const userStats = {
+    booksCount: books.filter((b) => b.id.startsWith('custom-') || b.id.startsWith('book-')).length,
+    bookmarksCount: bookmarks.length,
+    highlightsCount: highlights.length
+  };
 
   return (
     <div id="app" className="w-full min-h-screen relative overflow-x-hidden select-text">
@@ -207,10 +383,13 @@ export default function App() {
         <CoverView
           currentBook={currentBook}
           settings={settings}
+          currentUser={currentUser}
           onStartReading={() => setViewMode('reader')}
           onOpenLibrary={() => setIsLibraryOpen(true)}
           onOpenLogoModal={() => setIsLogoModalOpen(true)}
           onOpenUploadModal={() => setIsUploadModalOpen(true)}
+          onOpenAuth={() => setIsAuthOpen(true)}
+          onOpenAccountModal={() => setIsAccountModalOpen(true)}
         />
       ) : (
         /* ================= STATO 2: INTERFACCIA LETTORE ================= */
@@ -223,7 +402,7 @@ export default function App() {
           onOpenBookmarks={() => setIsBookmarksOpen(true)}
           onOpenSearch={() => setIsSearchOpen(true)}
           currentChapterId={currentChapterId}
-          onSelectChapter={setCurrentChapterId}
+          onSelectChapter={handleSelectChapter}
           bookmarks={bookmarks}
           highlights={highlights}
           onAddBookmark={handleAddBookmark}
@@ -233,13 +412,16 @@ export default function App() {
       )}
 
       {/* ================= MODALI E CASSETTI ================= */}
-      {/* 1. Modale Impostazioni con icone minimal personalizzate */}
+      {/* 1. Modale Impostazioni con Preferenze e Sezione Cloud */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
         onOpenLogoModal={() => setIsLogoModalOpen(true)}
+        currentUser={currentUser}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenAccountModal={() => setIsAccountModalOpen(true)}
       />
 
       {/* 2. Indice dei Capitoli */}
@@ -248,7 +430,7 @@ export default function App() {
         onClose={() => setIsTOCOpen(false)}
         book={currentBook}
         currentChapterId={currentChapterId}
-        onSelectChapter={setCurrentChapterId}
+        onSelectChapter={handleSelectChapter}
         themeConfig={themeConfig}
         font={settings.font}
       />
@@ -261,11 +443,11 @@ export default function App() {
         highlights={highlights.filter((h) => h.bookId === currentBook.id)}
         onRemoveBookmark={handleRemoveBookmark}
         onRemoveHighlight={handleRemoveHighlight}
-        onJumpToChapter={setCurrentChapterId}
+        onJumpToChapter={handleSelectChapter}
         themeConfig={themeConfig}
       />
 
-      {/* 4. Biblioteca delle Opere */}
+      {/* 4. Biblioteca delle Opere con Badge Cloud */}
       <LibraryModal
         isOpen={isLibraryOpen}
         onClose={() => setIsLibraryOpen(false)}
@@ -273,6 +455,8 @@ export default function App() {
         currentBookId={currentBook.id}
         onSelectBook={handleSelectBook}
         onOpenUploadModal={() => setIsUploadModalOpen(true)}
+        onDeleteBook={handleDeleteBook}
+        currentUser={currentUser}
         themeConfig={themeConfig}
       />
 
@@ -287,11 +471,12 @@ export default function App() {
         themeConfig={themeConfig}
       />
 
-      {/* 6. Importa nuovo libro / testo */}
+      {/* 6. Importa nuovo libro / testo & Salva nel database */}
       <CustomBookModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onAddBook={handleAddBook}
+        currentUser={currentUser}
         themeConfig={themeConfig}
       />
 
@@ -300,7 +485,27 @@ export default function App() {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         book={currentBook}
-        onJumpToResult={setCurrentChapterId}
+        onJumpToResult={handleSelectChapter}
+        themeConfig={themeConfig}
+      />
+
+      {/* 8. Modale di Autenticazione (Google / Email / Ospite) */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        currentUser={currentUser}
+        onUserChange={setCurrentUser}
+        themeConfig={themeConfig}
+      />
+
+      {/* 9. Modale Profilo Utente & Cloud Sync Stats */}
+      <UserAccountModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        user={currentUser}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onUserLoggedOut={() => setCurrentUser(null)}
+        stats={userStats}
         themeConfig={themeConfig}
       />
     </div>

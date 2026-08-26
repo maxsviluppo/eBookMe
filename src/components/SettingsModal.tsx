@@ -13,11 +13,15 @@ import {
   Sliders,
   Palette,
   BookOpen,
-  Volume2
+  Volume2,
+  User,
+  Cloud,
+  CheckCircle2
 } from 'lucide-react';
 import { ReaderSettings, ReaderTheme, ReaderFont, MarginWidth, TextAlign } from '../types';
 import { THEME_CONFIGS, FONT_CONFIGS, MARGIN_CONFIGS } from '../utils/themeStyles';
 import { BridgeLogo } from './BridgeLogo';
+import { UserProfile } from '../lib/firebase';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -25,6 +29,9 @@ interface SettingsModalProps {
   settings: ReaderSettings;
   onUpdateSettings: (newSettings: Partial<ReaderSettings>) => void;
   onOpenLogoModal: () => void;
+  currentUser?: UserProfile | null;
+  onOpenAuth?: () => void;
+  onOpenAccountModal?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -32,7 +39,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   settings,
   onUpdateSettings,
-  onOpenLogoModal
+  onOpenLogoModal,
+  currentUser,
+  onOpenAuth,
+  onOpenAccountModal
 }) => {
   if (!isOpen) return null;
 
@@ -52,7 +62,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="flex items-center space-x-2.5">
             <BridgeLogo variant="compact" themeMode={currentTheme.isDark ? 'dark' : 'light'} />
             <span className="opacity-40">•</span>
-            <h3 className="text-sm font-medium tracking-wide">Preferenze di Lettura</h3>
+            <h3 className="text-sm font-medium tracking-wide">Preferenze & Cloud</h3>
           </div>
           <button
             onClick={onClose}
@@ -65,6 +75,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Scrollable Settings Body */}
         <div className="p-6 space-y-6 overflow-y-auto flex-1">
+          {/* SEZIONE 0: ACCOUNT UTENTE & DATABASE CLOUD */}
+          <div className={`p-3.5 rounded-xl border flex items-center justify-between ${
+            currentTheme.isDark ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/60 border-[#E8E4DA]'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs">
+                {currentUser?.photoURL ? (
+                  <img src={currentUser.photoURL} alt="Avatar" className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+                ) : currentUser ? (
+                  (currentUser.displayName || currentUser.email || 'U')[0].toUpperCase()
+                ) : (
+                  <Cloud className="w-4 h-4 text-sky-500" />
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold">
+                  {currentUser ? (currentUser.displayName || currentUser.email || 'Account Connesso') : 'Account & Salvataggio Cloud'}
+                </p>
+                <div className="flex items-center gap-1 text-[10px] opacity-70">
+                  {currentUser ? (
+                    <>
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                      <span>Database Firestore Sincronizzato</span>
+                    </>
+                  ) : (
+                    <span>Accedi per salvare file eBook e note</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                onClose();
+                if (currentUser && onOpenAccountModal) {
+                  onOpenAccountModal();
+                } else if (onOpenAuth) {
+                  onOpenAuth();
+                }
+              }}
+              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                currentUser
+                  ? 'border-emerald-600/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
+                  : currentTheme.isDark
+                    ? 'border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-white'
+                    : 'border-[#D9D3C6] bg-white hover:bg-[#F3EFE6] text-[#282521]'
+              }`}
+            >
+              {currentUser ? 'Gestisci' : 'Accedi'}
+            </button>
+          </div>
+
           {/* SEZIONE 1: TEMI VISIVI (CROMATICA) */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -350,3 +412,4 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     </div>
   );
 };
+

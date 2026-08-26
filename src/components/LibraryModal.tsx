@@ -1,8 +1,9 @@
-import React from 'react';
-import { X, BookOpen, Clock, Calendar, Check, Plus, Library } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, BookOpen, Clock, Calendar, Check, Plus, Library, Cloud, Trash2, ShieldCheck } from 'lucide-react';
 import { Book } from '../types';
 import { LogoEmblem } from './LogoEmblem';
 import { ThemeConfig } from '../utils/themeStyles';
+import { UserProfile } from '../lib/firebase';
 
 interface LibraryModalProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface LibraryModalProps {
   currentBookId: string;
   onSelectBook: (book: Book) => void;
   onOpenUploadModal: () => void;
+  onDeleteBook?: (bookId: string) => void;
+  currentUser?: UserProfile | null;
   themeConfig: ThemeConfig;
 }
 
@@ -21,8 +24,12 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({
   currentBookId,
   onSelectBook,
   onOpenUploadModal,
+  onDeleteBook,
+  currentUser,
   themeConfig
 }) => {
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   return (
@@ -36,9 +43,17 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({
         <div className={`px-6 py-4 flex items-center justify-between border-b ${
           themeConfig.isDark ? 'border-neutral-800' : 'border-[#EAE6DC]'
         }`}>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2.5">
             <Library className="w-4 h-4 opacity-70" />
-            <h3 className="text-sm font-medium tracking-wide">Biblioteca & Opere</h3>
+            <div>
+              <h3 className="text-sm font-medium tracking-wide">Biblioteca & Opere</h3>
+              <div className="flex items-center gap-1.5 text-[10px] opacity-60">
+                <Cloud className="w-3 h-3 text-sky-500" />
+                <span>
+                  {currentUser ? 'Database Cloud Attivo' : 'Archiviazione Locale'}
+                </span>
+              </div>
+            </div>
           </div>
           <div className="flex items-center space-x-2">
             <button
@@ -48,12 +63,12 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({
               }}
               className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all ${
                 themeConfig.isDark
-                  ? 'border-neutral-700 bg-neutral-800 hover:bg-neutral-700'
-                  : 'border-[#DFD9CE] bg-white hover:bg-[#EFEBE2]'
+                  ? 'border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-white'
+                  : 'border-[#DFD9CE] bg-white hover:bg-[#EFEBE2] text-[#282521]'
               }`}
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Nuovo Testo</span>
+              <span>Importa / Salva eBook</span>
             </button>
             <button
               onClick={onClose}
@@ -71,6 +86,7 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({
             {books.map((book) => {
               const isSelected = book.id === currentBookId;
               const totalMins = book.chapters.reduce((a, c) => a + c.readingTimeMinutes, 0);
+              const isUserUploaded = book.id.startsWith('custom-') || book.id.startsWith('book-');
 
               return (
                 <div
@@ -101,13 +117,45 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium leading-snug truncate">{book.title}</h4>
-                        {isSelected && <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 ml-1" />}
+                        <h4 className="text-sm font-medium leading-snug truncate pr-1">{book.title}</h4>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {isSelected && <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />}
+                          {onDeleteBook && isUserUploaded && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (deleteConfirmId === book.id) {
+                                  onDeleteBook(book.id);
+                                  setDeleteConfirmId(null);
+                                } else {
+                                  setDeleteConfirmId(book.id);
+                                  setTimeout(() => setDeleteConfirmId(null), 3000);
+                                }
+                              }}
+                              className={`p-1 rounded opacity-60 hover:opacity-100 transition-all ${
+                                deleteConfirmId === book.id
+                                  ? 'bg-rose-500 text-white opacity-100 text-[10px] px-1.5'
+                                  : 'hover:text-rose-500'
+                              }`}
+                              title="Elimina dal Cloud"
+                            >
+                              {deleteConfirmId === book.id ? 'Conferma?' : <Trash2 className="w-3.5 h-3.5" />}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs opacity-70 truncate mt-0.5">{book.author}</p>
-                      {book.genre && (
-                        <span className="text-[10px] opacity-50 block mt-1">{book.genre}</span>
-                      )}
+                      <div className="flex items-center gap-2 mt-1">
+                        {isUserUploaded && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 font-mono font-medium flex items-center gap-1">
+                            <Cloud className="w-2.5 h-2.5" />
+                            <span>Cloud</span>
+                          </span>
+                        )}
+                        {book.genre && (
+                          <span className="text-[10px] opacity-50 block">{book.genre}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -124,3 +172,4 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({
     </div>
   );
 };
+

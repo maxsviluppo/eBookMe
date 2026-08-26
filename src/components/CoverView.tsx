@@ -3,24 +3,31 @@ import { Book, ReaderSettings } from '../types';
 import { LogoEmblem } from './LogoEmblem';
 import { BridgeLogo } from './BridgeLogo';
 import { THEME_CONFIGS, FONT_CONFIGS } from '../utils/themeStyles';
-import { Library, Upload, Sparkles, ChevronRight, BookOpen, Clock, Calendar } from 'lucide-react';
+import { Library, Upload, Sparkles, ChevronRight, BookOpen, Clock, Calendar, User, Cloud, CheckCircle2 } from 'lucide-react';
+import { UserProfile } from '../lib/firebase';
 
 interface CoverViewProps {
   currentBook: Book;
   settings: ReaderSettings;
+  currentUser: UserProfile | null;
   onStartReading: () => void;
   onOpenLibrary: () => void;
   onOpenLogoModal: () => void;
   onOpenUploadModal: () => void;
+  onOpenAuth: () => void;
+  onOpenAccountModal: () => void;
 }
 
 export const CoverView: React.FC<CoverViewProps> = ({
   currentBook,
   settings,
+  currentUser,
   onStartReading,
   onOpenLibrary,
   onOpenLogoModal,
-  onOpenUploadModal
+  onOpenUploadModal,
+  onOpenAuth,
+  onOpenAccountModal
 }) => {
   const [hoveredLogo, setHoveredLogo] = useState(false);
   const themeConfig = THEME_CONFIGS[settings.theme];
@@ -64,6 +71,37 @@ export const CoverView: React.FC<CoverViewProps> = ({
           className="flex items-center space-x-2"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* User Account / Cloud Sync status */}
+          <button
+            onClick={currentUser ? onOpenAccountModal : onOpenAuth}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all shadow-2xs ${
+              currentUser
+                ? themeConfig.isDark
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                  : 'border-emerald-600/30 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                : themeConfig.isDark
+                  ? 'border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 text-neutral-200'
+                  : 'border-[#E0DBD0] bg-white/60 hover:bg-white text-[#38332B]'
+            }`}
+            title={currentUser ? 'Account Cloud Sincronizzato' : 'Accedi al Cloud'}
+          >
+            {currentUser?.photoURL ? (
+              <img
+                src={currentUser.photoURL}
+                alt="Avatar"
+                className="w-3.5 h-3.5 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : currentUser ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            ) : (
+              <User className="w-3.5 h-3.5 opacity-70" />
+            )}
+            <span className="hidden sm:inline">
+              {currentUser ? (currentUser.displayName?.split(' ')[0] || 'Account Cloud') : 'Accedi'}
+            </span>
+          </button>
+
           <button
             onClick={onOpenLibrary}
             className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all shadow-2xs ${

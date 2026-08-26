@@ -1,6 +1,6 @@
 {
   "name": "eBookMe - Minimal Reader",
-  "description": "Un'esperienza di lettura digitale raffinata firmata eBookMe: tipografia d'autore, supporto dark e light mode, e impaginazione minimalista.",
+  "description": "Un'esperienza di lettura digitale raffinata firmata eBookMe con accesso personalizzato, salvataggio file eBook su database cloud Firestore, tipografia d'autore e impaginazione minimalista.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
