@@ -39,6 +39,8 @@ export interface HighlightItem {
   createdAt: string;
 }
 
+export type BookmarkColor = 'amber' | 'emerald' | 'sky' | 'rose' | 'purple' | 'indigo';
+
 export interface BookmarkItem {
   id: string;
   bookId: string;
@@ -46,6 +48,8 @@ export interface BookmarkItem {
   chapterTitle: string;
   paragraphIndex: number;
   snippet: string;
+  note?: string;
+  color?: BookmarkColor;
   createdAt: string;
 }
 

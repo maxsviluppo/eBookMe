@@ -3,7 +3,7 @@ import { Book, ReaderSettings } from '../types';
 import { LogoEmblem } from './LogoEmblem';
 import { BridgeLogo } from './BridgeLogo';
 import { THEME_CONFIGS, FONT_CONFIGS } from '../utils/themeStyles';
-import { Library, Upload, Sparkles, ChevronRight, BookOpen, Clock, Calendar, User, Cloud, CheckCircle2 } from 'lucide-react';
+import { Library, Upload, Sparkles, ChevronRight, BookOpen, Clock, Calendar, User, Cloud, CheckCircle2, Save } from 'lucide-react';
 import { UserProfile } from '../lib/firebase';
 
 interface CoverViewProps {
@@ -68,64 +68,61 @@ export const CoverView: React.FC<CoverViewProps> = ({
 
         {/* Quick actions that don't trigger reading when clicked */}
         <div
-          className="flex items-center space-x-2"
+          className="flex items-center space-x-1.5 sm:space-x-2"
           onClick={(e) => e.stopPropagation()}
         >
           {/* User Account / Cloud Sync status */}
           <button
             onClick={currentUser ? onOpenAccountModal : onOpenAuth}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all shadow-2xs ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
               currentUser
                 ? themeConfig.isDark
-                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
-                  : 'border-emerald-600/30 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                  ? 'border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20'
+                  : 'border-sky-600/30 bg-sky-50 text-sky-800 hover:bg-sky-100'
                 : themeConfig.isDark
-                  ? 'border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 text-neutral-200'
-                  : 'border-[#E0DBD0] bg-white/60 hover:bg-white text-[#38332B]'
+                  ? 'border-rose-900/40 bg-rose-950/20 hover:bg-rose-900/30 text-rose-300'
+                  : 'border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 text-rose-800'
             }`}
-            title={currentUser ? 'Account Cloud Sincronizzato' : 'Accedi al Cloud'}
+            title={currentUser ? 'Database Cloud Attivo (Sincronizzato)' : 'Database Cloud Disattivo (Clicca per Accedere)'}
           >
-            {currentUser?.photoURL ? (
-              <img
-                src={currentUser.photoURL}
-                alt="Avatar"
-                className="w-3.5 h-3.5 rounded-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            ) : currentUser ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-            ) : (
-              <User className="w-3.5 h-3.5 opacity-70" />
-            )}
+            {/* Nuvoletta: Azzurra attiva, Rossa disattiva */}
+            <Cloud
+              className={`w-4 h-4 transition-colors shrink-0 ${
+                currentUser
+                  ? 'text-sky-500 fill-sky-500/20 animate-pulse'
+                  : 'text-rose-500 fill-rose-500/20'
+              }`}
+            />
             <span className="hidden sm:inline">
-              {currentUser ? (currentUser.displayName?.split(' ')[0] || 'Account Cloud') : 'Accedi'}
+              {currentUser ? (currentUser.displayName?.split(' ')[0] || 'Cloud Attivo') : 'Accedi'}
             </span>
           </button>
 
           <button
             onClick={onOpenLibrary}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all shadow-2xs ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
               themeConfig.isDark
                 ? 'border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 text-neutral-200'
                 : 'border-[#E0DBD0] bg-white/60 hover:bg-white text-[#38332B]'
             }`}
             title="Sfoglia biblioteca"
           >
-            <Library className="w-3.5 h-3.5 opacity-70" />
+            <Library className="w-3.5 h-3.5 opacity-70 shrink-0" />
             <span className="hidden sm:inline">Biblioteca</span>
           </button>
 
           <button
             onClick={onOpenUploadModal}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all shadow-2xs ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
               themeConfig.isDark
                 ? 'border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 text-neutral-200'
                 : 'border-[#E0DBD0] bg-white/60 hover:bg-white text-[#38332B]'
             }`}
-            title="Importa testo o file"
+            title="Importa o Salva nuovo eBook"
           >
-            <Upload className="w-3.5 h-3.5 opacity-70" />
-            <span className="hidden sm:inline">Importa</span>
+            <Save className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+            <span className="hidden sm:inline">Importa / Salva</span>
+            <span className="sm:hidden">Importa</span>
           </button>
         </div>
       </div>
@@ -207,9 +204,20 @@ export const CoverView: React.FC<CoverViewProps> = ({
       </div>
 
       {/* Bottom Footer Note */}
-      <div className="w-full max-w-4xl flex items-center justify-between text-[11px] opacity-50">
-        <span className="tracking-wide">eBookMe • Edizione Digitale</span>
-        <span className="font-mono">{themeConfig.label}</span>
+      <div className="w-full max-w-4xl flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] opacity-60 text-center sm:text-left">
+        <div className="flex items-center gap-1.5">
+          <span>eBookMe • Ideatore</span>
+          <span className="font-semibold tracking-wide">CASTRO MASSIMO</span>
+        </div>
+        <a
+          href="https://www.codecafe.it"
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="hover:underline hover:opacity-100 transition-opacity font-medium tracking-wide"
+        >
+          www.codecafe.it
+        </a>
       </div>
     </div>
   );

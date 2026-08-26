@@ -80,27 +80,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             currentTheme.isDark ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/60 border-[#E8E4DA]'
           }`}>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${
+                currentUser ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+              }`}>
                 {currentUser?.photoURL ? (
                   <img src={currentUser.photoURL} alt="Avatar" className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
                 ) : currentUser ? (
-                  (currentUser.displayName || currentUser.email || 'U')[0].toUpperCase()
+                  <Cloud className="w-4 h-4 text-sky-500 fill-sky-500/20" />
                 ) : (
-                  <Cloud className="w-4 h-4 text-sky-500" />
+                  <Cloud className="w-4 h-4 text-rose-500 fill-rose-500/20" />
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold">
-                  {currentUser ? (currentUser.displayName || currentUser.email || 'Account Connesso') : 'Account & Salvataggio Cloud'}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-semibold">
+                    {currentUser ? (currentUser.displayName || currentUser.email || 'Database Cloud Attivo') : 'Database Cloud Disattivo'}
+                  </p>
+                  <Cloud className={`w-3.5 h-3.5 ${currentUser ? 'text-sky-500 fill-sky-500/20' : 'text-rose-500 fill-rose-500/20'}`} />
+                </div>
                 <div className="flex items-center gap-1 text-[10px] opacity-70">
                   {currentUser ? (
                     <>
-                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                      <span>Database Firestore Sincronizzato</span>
+                      <CheckCircle2 className="w-3 h-3 text-sky-500" />
+                      <span>Sincronizzato con Firestore</span>
                     </>
                   ) : (
-                    <span>Accedi per salvare file eBook e note</span>
+                    <span>Accedi per sincronizzare eBook e note</span>
                   )}
                 </div>
               </div>
@@ -115,9 +120,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onOpenAuth();
                 }
               }}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
                 currentUser
-                  ? 'border-emerald-600/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
+                  ? 'border-sky-600/30 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10'
                   : currentTheme.isDark
                     ? 'border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-white'
                     : 'border-[#D9D3C6] bg-white hover:bg-[#F3EFE6] text-[#282521]'

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Book, ReaderSettings, BookmarkItem, HighlightItem } from './types';
+import { Book, ReaderSettings, BookmarkItem, HighlightItem, BookmarkColor } from './types';
 import { SAMPLE_BOOKS } from './data/sampleBooks';
 import { CoverView } from './components/CoverView';
 import { ReaderView } from './components/ReaderView';
@@ -22,6 +22,7 @@ import {
   saveReadingProgressToCloud,
   saveBookmarkToCloud,
   deleteBookmarkFromCloud,
+  clearAllBookmarksForBookFromCloud,
   subscribeToUserBookmarks,
   saveHighlightToCloud,
   deleteHighlightFromCloud,
@@ -308,7 +309,7 @@ export default function App() {
     });
   };
 
-  const handleAddBookmark = (snippet: string, paragraphIndex: number) => {
+  const handleAddBookmark = (snippet: string, paragraphIndex: number, color?: BookmarkColor, note?: string) => {
     const currentChapter = currentBook.chapters.find((c) => c.id === currentChapterId) || currentBook.chapters[0];
     const newBm: BookmarkItem = {
       id: `bm-${Date.now()}`,
@@ -317,19 +318,34 @@ export default function App() {
       chapterTitle: currentChapter.title,
       paragraphIndex,
       snippet,
+      color: 'amber', // Segnalibro arancione
+      note: note || undefined,
       createdAt: new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
     };
-    setBookmarks((prev) => [newBm, ...prev]);
+
+    // Assicura che esista un unico segnalibro per questo libro nello stato locale
+    setBookmarks((prev) => [newBm, ...prev.filter((b) => b.bookId !== currentBook.id)]);
 
     if (currentUser?.uid) {
-      saveBookmarkToCloud(currentUser.uid, newBm).catch(console.error);
+      // Pulisce tutti i vecchi segnalibri dal database per questo libro e salva il nuovo
+      clearAllBookmarksForBookFromCloud(currentUser.uid, currentBook.id)
+        .then(() => saveBookmarkToCloud(currentUser.uid, newBm))
+        .catch(console.error);
     }
   };
 
   const handleRemoveBookmark = (id: string) => {
-    setBookmarks((prev) => prev.filter((b) => b.id !== id));
+    const targetBm = bookmarks.find((b) => b.id === id);
+    const targetBookId = targetBm?.bookId || currentBook.id;
+
+    // Rimuove da stato locale azzerando i segnalibri di questo libro
+    setBookmarks((prev) => prev.filter((b) => b.id !== id && b.bookId !== targetBookId));
+
     if (currentUser?.uid) {
-      deleteBookmarkFromCloud(currentUser.uid, id).catch(console.error);
+      // Cancella dal database Firestore il singolo ID ed esegue l'azzeramento completo per il libro
+      deleteBookmarkFromCloud(currentUser.uid, id)
+        .then(() => clearAllBookmarksForBookFromCloud(currentUser.uid, targetBookId))
+        .catch(console.error);
     }
   };
 
@@ -359,12 +375,21 @@ export default function App() {
     }
   };
 
-  const handleSelectChapter = (chapterId: string) => {
+  const handleSelectChapter = (chapterId: string, paragraphIndex?: number) => {
     setCurrentChapterId(chapterId);
     if (currentUser?.uid) {
       const idx = currentBook.chapters.findIndex((c) => c.id === chapterId);
       const pct = Math.round(((idx + 1) / currentBook.chapters.length) * 100);
       saveReadingProgressToCloud(currentUser.uid, currentBook.id, chapterId, idx, pct).catch(console.error);
+    }
+
+    if (paragraphIndex !== undefined && paragraphIndex > 0) {
+      setTimeout(() => {
+        const paragraphs = document.querySelectorAll('#reader-interface article p');
+        if (paragraphs[paragraphIndex]) {
+          paragraphs[paragraphIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150);
     }
   };
 
@@ -433,6 +458,8 @@ export default function App() {
         onSelectChapter={handleSelectChapter}
         themeConfig={themeConfig}
         font={settings.font}
+        bookmarks={bookmarks.filter((b) => b.bookId === currentBook.id)}
+        onRemoveBookmark={handleRemoveBookmark}
       />
 
       {/* 3. Segnalibri & Note */}

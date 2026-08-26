@@ -55,7 +55,7 @@
     },
     "Bookmark": {
       "title": "Bookmark",
-      "description": "User bookmark in an eBook",
+      "description": "User bookmark in an eBook with color tag and custom label",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -65,6 +65,8 @@
         "chapterTitle": { "type": "string" },
         "paragraphIndex": { "type": "number" },
         "snippet": { "type": "string" },
+        "note": { "type": "string" },
+        "color": { "type": "string" },
         "createdAt": { "type": "string" }
       },
       "required": ["id", "userId", "bookId", "chapterId", "snippet"]

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, BookOpen, Clock, Calendar, Check, Plus, Library, Cloud, Trash2, ShieldCheck } from 'lucide-react';
+import { X, BookOpen, Clock, Calendar, Check, Plus, Library, Cloud, Trash2, ShieldCheck, Upload, Save } from 'lucide-react';
 import { Book } from '../types';
 import { LogoEmblem } from './LogoEmblem';
 import { ThemeConfig } from '../utils/themeStyles';
@@ -40,39 +40,47 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({
         }`}
       >
         {/* Header */}
-        <div className={`px-6 py-4 flex items-center justify-between border-b ${
+        <div className={`px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between border-b ${
           themeConfig.isDark ? 'border-neutral-800' : 'border-[#EAE6DC]'
         }`}>
-          <div className="flex items-center space-x-2.5">
-            <Library className="w-4 h-4 opacity-70" />
-            <div>
-              <h3 className="text-sm font-medium tracking-wide">Biblioteca & Opere</h3>
-              <div className="flex items-center gap-1.5 text-[10px] opacity-60">
-                <Cloud className="w-3 h-3 text-sky-500" />
-                <span>
-                  {currentUser ? 'Database Cloud Attivo' : 'Archiviazione Locale'}
-                </span>
+          <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0">
+            <Library className="w-4 h-4 opacity-70 shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-medium tracking-wide truncate">Biblioteca & Opere</h3>
+                <div
+                  title={currentUser ? 'Database Cloud Attivo' : 'Database Cloud Disattivo (Accesso richiesto)'}
+                  className="flex items-center shrink-0 cursor-default"
+                >
+                  <Cloud
+                    className={`w-4 h-4 transition-colors ${
+                      currentUser ? 'text-sky-500 fill-sky-500/20' : 'text-rose-500 fill-rose-500/20'
+                    }`}
+                  />
+                </div>
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 shrink-0">
             <button
               onClick={() => {
                 onClose();
                 onOpenUploadModal();
               }}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
                 themeConfig.isDark
                   ? 'border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-white'
                   : 'border-[#DFD9CE] bg-white hover:bg-[#EFEBE2] text-[#282521]'
               }`}
+              title="Importa o Salva nuovo eBook"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Importa / Salva eBook</span>
+              <Upload className="w-3.5 h-3.5 text-sky-500" />
+              <span className="hidden xs:inline">Importa / Salva</span>
+              <span className="xs:hidden">Importa</span>
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg opacity-60 hover:opacity-100 transition-opacity hover:bg-black/5 dark:hover:bg-white/5"
+              className="p-1.5 rounded-lg opacity-60 hover:opacity-100 transition-opacity hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
               aria-label="Chiudi biblioteca"
             >
               <X className="w-4 h-4" />

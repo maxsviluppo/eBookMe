@@ -18,6 +18,7 @@ import {
   getDoc,
   collection,
   query,
+  where,
   getDocs,
   deleteDoc,
   onSnapshot,
@@ -141,16 +142,34 @@ export const logoutUser = async (): Promise<void> => {
 // ----------------- FIRESTORE DATA PERSISTENCE -----------------
 
 /**
+ * Strips undefined fields recursively to prevent Firestore 'unsupported field value: undefined' errors
+ */
+function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+        result[key] = sanitizeForFirestore(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Save or update a book in user's cloud library
  */
 export const saveUserBookToCloud = async (userId: string, book: Book): Promise<void> => {
   if (!userId) return;
   const bookRef = doc(db, 'users', userId, 'books', book.id);
-  await setDoc(bookRef, {
+  const data = sanitizeForFirestore({
     ...book,
     userId,
     updatedAt: new Date().toISOString()
-  }, { merge: true });
+  });
+  await setDoc(bookRef, data, { merge: true });
 };
 
 /**
@@ -194,14 +213,15 @@ export const saveReadingProgressToCloud = async (
 ): Promise<void> => {
   if (!userId || !bookId) return;
   const progressRef = doc(db, 'users', userId, 'progress', bookId);
-  await setDoc(progressRef, {
+  const data = sanitizeForFirestore({
     bookId,
     userId,
     currentChapterId: chapterId,
     currentChapterIndex: chapterIndex,
     percentage,
     lastReadAt: new Date().toISOString()
-  }, { merge: true });
+  });
+  await setDoc(progressRef, data, { merge: true });
 };
 
 /**
@@ -210,19 +230,51 @@ export const saveReadingProgressToCloud = async (
 export const saveBookmarkToCloud = async (userId: string, bookmark: BookmarkItem): Promise<void> => {
   if (!userId) return;
   const bmRef = doc(db, 'users', userId, 'bookmarks', bookmark.id);
-  await setDoc(bmRef, {
-    ...bookmark,
+  const data = sanitizeForFirestore({
+    id: bookmark.id,
+    bookId: bookmark.bookId,
+    chapterId: bookmark.chapterId,
+    chapterTitle: bookmark.chapterTitle,
+    paragraphIndex: bookmark.paragraphIndex ?? 0,
+    snippet: bookmark.snippet || '',
+    color: bookmark.color || 'amber',
+    note: bookmark.note || '',
+    createdAt: bookmark.createdAt || new Date().toISOString(),
     userId
-  }, { merge: true });
+  });
+  await setDoc(bmRef, data, { merge: true });
 };
 
 /**
  * Delete a Bookmark from Firestore
  */
 export const deleteBookmarkFromCloud = async (userId: string, bookmarkId: string): Promise<void> => {
-  if (!userId) return;
-  const bmRef = doc(db, 'users', userId, 'bookmarks', bookmarkId);
-  await deleteDoc(bmRef);
+  if (!userId || !bookmarkId) return;
+  try {
+    const bmRef = doc(db, 'users', userId, 'bookmarks', bookmarkId);
+    await deleteDoc(bmRef);
+  } catch (err) {
+    console.error('Error deleting bookmark document:', err);
+  }
+};
+
+/**
+ * Delete all bookmarks for a specific book from Firestore (resets all bookmarks for that book in DB)
+ */
+export const clearAllBookmarksForBookFromCloud = async (userId: string, bookId: string): Promise<void> => {
+  if (!userId || !bookId) return;
+  try {
+    const bmColl = collection(db, 'users', userId, 'bookmarks');
+    const q = query(bmColl, where('bookId', '==', bookId));
+    const snap = await getDocs(q);
+    const deletePromises: Promise<void>[] = [];
+    snap.forEach((d) => {
+      deletePromises.push(deleteDoc(d.ref));
+    });
+    await Promise.all(deletePromises);
+  } catch (err) {
+    console.error('Error clearing book bookmarks from Firestore:', err);
+  }
 };
 
 /**
@@ -251,10 +303,18 @@ export const subscribeToUserBookmarks = (
 export const saveHighlightToCloud = async (userId: string, highlight: HighlightItem): Promise<void> => {
   if (!userId) return;
   const hlRef = doc(db, 'users', userId, 'highlights', highlight.id);
-  await setDoc(hlRef, {
-    ...highlight,
+  const data = sanitizeForFirestore({
+    id: highlight.id,
+    bookId: highlight.bookId,
+    chapterId: highlight.chapterId,
+    chapterTitle: highlight.chapterTitle,
+    text: highlight.text || '',
+    color: highlight.color || 'yellow',
+    note: highlight.note || '',
+    createdAt: highlight.createdAt || new Date().toISOString(),
     userId
-  }, { merge: true });
+  });
+  await setDoc(hlRef, data, { merge: true });
 };
 
 /**
@@ -292,11 +352,12 @@ export const subscribeToUserHighlights = (
 export const saveReaderSettingsToCloud = async (userId: string, settings: ReaderSettings): Promise<void> => {
   if (!userId) return;
   const setRef = doc(db, 'users', userId, 'settings', 'reader');
-  await setDoc(setRef, {
+  const data = sanitizeForFirestore({
     ...settings,
     userId,
     updatedAt: new Date().toISOString()
-  }, { merge: true });
+  });
+  await setDoc(setRef, data, { merge: true });
 };
 
 /**
